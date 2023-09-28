@@ -63,6 +63,8 @@ def droid_visualization(video, device="cuda:0"):
 
     droid_visualization.filter_thresh = 0.005
 
+    first_time = True
+
     def increase_filter(vis):
         droid_visualization.filter_thresh *= 2
         with droid_visualization.video.get_lock():
@@ -74,8 +76,10 @@ def droid_visualization(video, device="cuda:0"):
             droid_visualization.video.dirty[:droid_visualization.video.counter.value] = True
 
     def animation_callback(vis):
-        cam = vis.get_view_control().convert_to_pinhole_camera_parameters()
-
+        nonlocal first_time
+        #cam = vis.get_view_control().convert_to_pinhole_camera_parameters()
+        view_ctrl = vis.get_view_control()
+        cam = view_ctrl.convert_to_pinhole_camera_parameters()
         with torch.no_grad():
 
             with video.get_lock():
@@ -111,17 +115,17 @@ def droid_visualization(video, device="cuda:0"):
                 ix = dirty_index[i].item()
 
                 if ix in droid_visualization.cameras:
-                    vis.remove_geometry(droid_visualization.cameras[ix])
+                    vis.remove_geometry(droid_visualization.cameras[ix], reset_bounding_box=False)
                     del droid_visualization.cameras[ix]
 
                 if ix in droid_visualization.points:
-                    vis.remove_geometry(droid_visualization.points[ix])
+                    vis.remove_geometry(droid_visualization.points[ix], reset_bounding_box=False)
                     del droid_visualization.points[ix]
 
                 ### add camera actor ###
                 cam_actor = create_camera_actor(True)
                 cam_actor.transform(pose)
-                vis.add_geometry(cam_actor)
+                vis.add_geometry(cam_actor, reset_bounding_box=False)
                 droid_visualization.cameras[ix] = cam_actor
 
                 mask = masks[i].reshape(-1)
@@ -130,12 +134,14 @@ def droid_visualization(video, device="cuda:0"):
                 
                 ## add point actor ###
                 point_actor = create_point_actor(pts, clr)
-                vis.add_geometry(point_actor)
+                vis.add_geometry(point_actor, reset_bounding_box=first_time)
+                first_time = False
                 droid_visualization.points[ix] = point_actor
 
             # hack to allow interacting with vizualization during inference
-            if len(droid_visualization.cameras) >= droid_visualization.warmup:
-                cam = vis.get_view_control().convert_from_pinhole_camera_parameters(cam)
+            #if len(droid_visualization.cameras) >= droid_visualization.warmup:
+                #    cam = vis.get_view_control().convert_from_pinhole_camera_parameters(cam)
+            view_ctrl.convert_from_pinhole_camera_parameters(cam)
 
             droid_visualization.ix += 1
             vis.poll_events()
@@ -149,6 +155,7 @@ def droid_visualization(video, device="cuda:0"):
 
     vis.create_window(height=540, width=960)
     vis.get_render_option().load_from_json("misc/renderoption.json")
+
 
     vis.run()
     vis.destroy_window()
