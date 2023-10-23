@@ -16,7 +16,7 @@ from droid import Droid
 
 import torch.nn.functional as F
 
-from mayfly.videocapture import VideoCapture
+from mayfly.sensorcapture import SensorCapture
 
 def show_image(image):
     image = image.permute(1, 2, 0).cpu().numpy()
@@ -35,13 +35,15 @@ def image_stream(imagedir, calib, stride):
     K[1,1] = fy
     K[1,2] = cy
 
-    cap = VideoCapture(list(range(64)), '')
+    cap = SensorCapture(list(range(64)), '')
 
     t = -1
     while True:
         t += 1
-        frames = cap.read()
-        frm = frames[0] # It may have more than 1 frame if sync cameras or ToF. We assume 1 frame
+        capture = cap.read()
+        if capture['type'] != 'camera':
+            continue
+        frm = capture['frames'][0] # It may have more than 1 frame if sync cameras or ToF. We assume 1 frame
         arr = np.from_dlpack(frm['image']).copy()
         image = cv2.cvtColor(arr[:,:,:3], cv2.COLOR_RGB2BGR)
  
